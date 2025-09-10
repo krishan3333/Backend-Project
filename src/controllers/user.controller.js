@@ -1,14 +1,14 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
-import { User } from "../models/User.js";
+import { User } from "../models/user.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const registerUser = (async (req, res) => {
 
+console.log("FILES RECEIVED:", req.files);
 
-
-   const {fullName, email,userName,password}= req.body
+    const { fullName, email, userName, password } = req.body
     console.log("email:", email)
 
     if (
@@ -18,27 +18,38 @@ const registerUser = (async (req, res) => {
     }
 
 
-    const existedUser= User.findOne({
+    const existedUser= await User.findOne({
         $or: [{ email }, { userName }]
     })
     if(existedUser){
         throw new ApiError(409, "Email or username already exists")
     }
+    // console.log( req.files);
     const avatarLocalPath=req.files?.avatar[0]?.path
-    const coverImageLocalPath=req.files?.coverImage[0]?.path
-
     if(!avatarLocalPath){
         throw new ApiError(400, "Avatar and cover image are required")
     }
-
     const avatar = await uploadToCloudinary(avatarLocalPath, "avatars")
-    const coverImage = await uploadToCloudinary(coverImageLocalPath, "coverImages")
-
     if(!avatar){    
-    throw new ApiError(400, "Failed to upload avatar")
+    throw new ApiError(500, "Failed to upload avatar")
     }
+    
+    let coverImage = null; // Default to null
+    const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
+    if (coverImageLocalPath) {
+        coverImage = await uploadToCloudinary(coverImageLocalPath, "coverImages");
+        // No need to throw error if cover image fails, as it's optional
+        if (!coverImage) {
+            console.error("Cover image upload failed but proceeding without it.");
+        }
+    }
+    // const coverImageLocalPath=req.files?.coverImage[0]?.path
 
-    await User.create({
+
+    // const coverImage = await uploadToCloudinary(coverImageLocalPath, "coverImages")
+    
+
+    const user =await User.create({
         fullName,
         avatar: avatar.url,
         coverImage: coverImage?.url || "",
